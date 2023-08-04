@@ -7,6 +7,7 @@ import mysql.connector
 from flask_login import LoginManager, UserMixin, login_user, login_required
 from flask_caching import Cache
 from functools import lru_cache
+from delete_database import delete_all_credentials
 
 config = {
     "DEBUG": True,
@@ -52,10 +53,10 @@ def validar_operador(operador):
     return operador in valid_operators
     
 
-host = os.getenv('LB_HOST')
-user = os.getenv('LB_USER')
-password = os.getenv('LB_PASSWORD')
-database = os.getenv('LB_DATABASE')
+host = os.getenv('DB_HOST')
+user = os.getenv('DB_USER')
+password = os.getenv('DB_PASSWORD')
+database = os.getenv('DB_DATABASE')
 
 
 def validar_credenciales(correo, contrasena):
@@ -82,10 +83,10 @@ def validar_credenciales(correo, contrasena):
     
   #Agregar nuevos usuarios  
 db_config = {
-    'host': os.getenv('LB_HOST'),
-    'user': os.getenv('LB_USER'),
-    'password': os.getenv('LB_PASSWORD'),
-    'database': os.getenv('LB_DATABASE')
+    'host': os.getenv('DB_HOST'),
+    'user': os.getenv('DB_USER'),
+    'password': os.getenv('DB_PASSWORD'),
+    'database': os.getenv('DB_DATABASE')
 }
     
 def validar_admin(correo, contrasena):
@@ -150,99 +151,100 @@ def upload():
         else:
             flash("Success, Todos los datos son correctos.")
 
-            # load_dotenv()
-            # host = os.getenv('LB_HOST')
-            # user = os.getenv('LB_USER')
-            # password = os.getenv('LB_PASSWORD')
-            # database = os.getenv('LB_DATABASE')
+            load_dotenv()
+            host = os.getenv('DB_HOST')
+            user = os.getenv('DB_USER')
+            password = os.getenv('DB_PASSWORD')
+            database = os.getenv('DB_DATABASE')
 
-            # def create_connection():
-            #     try:
-            #         connection = mysql.connector.connect(
-            #             host=host,
-            #             user=user,
-            #             password=password,
-            #             database=database
-            #         )
-            #         if connection.is_connected():
-            #             flash("Conexión a la base de datos exitosa")
-            #             return connection
-            #     except Exception as e:
-            #         flash("Error en la conexión a la base de datos.", e)
-            #         return None
+            def create_connection():
+                try:
+                    connection = mysql.connector.connect(
+                        host=host,
+                        user=user,
+                        password=password,
+                        database=database
+                    )
+                    if connection.is_connected():
+                        flash("Conexión a la base de datos exitosa")
+                        return connection
+                except Exception as e:
+                    flash("Error en la conexión a la base de datos.", e)
+                    return None
 
-            # def read_load_table(connection):
-            #     try:
-            #         cursor = connection.cursor()
-            #         df = pd.read_excel(file)                    
-            #         for index, fila in df.iterrows():
-            #             sql_insertar = f"""
-            #             INSERT INTO valip (tipo_call, id_campana, nombre_cliente, apellido_cliente, identificacion, resultado_maquina, telefono, fecha, operado_por)
-            #             VALUES ('{fila[0]}', '{fila[1]}', '{fila[2]}', '{fila[3]}', '{fila[4]}', '{fila[5]}', '{fila[6]}', '{fila[7]}', '{fila[8]}')
-            #             """
-            #             cursor.execute(sql_insertar)    
-            #         connection.commit()
-            #         cursor.close()
-            #         flash("Cargue de datos a la tabla exitoso")
-            #     except Exception as e:
-            #         flash("Error en el cargue a la base de datos.", e)
-            
-            # conexion = create_connection()
-            # if conexion:
-            #     read_load_table(conexion)
-            #     conexion.close()
+            def read_load_table(connection):
+                try:
+                    cursor = connection.cursor()
+                    df = pd.read_excel(file)                    
+                    for index, fila in df.iterrows():
+                        
+                        sql_insertar = f"""
+                        INSERT INTO validator_ivr (Id_Cliente__c, Operado_Por__c)
+                        VALUES ('{fila[0]}', '{fila[1]}')
+                        """
+                        cursor.execute(sql_insertar)    
+                    connection.commit()
+                    cursor.close()
+                    flash("Cargue de datos a la tabla exitoso")
+                except Exception as e:
+                    flash("Error en el cargue a la base de datos.", e)
+            delete_all_credentials()
+            conexion = create_connection()
+            if conexion:
+                read_load_table(conexion)
+                conexion.close()
     except Exception as e:
         flash(f"Error: {str(e)}")
 
     return render_template("index.html")
 
 
-# #Validar usuarios admin
-# @app.route('/admin', methods=['GET'])
-# def login2():
-#     return render_template('login_admin.html')
+#Validar usuarios admin
+@app.route('/admin', methods=['GET'])
+def login2():
+    return render_template('login_admin.html')
 
-# @app.route('/admin', methods=['POST', 'GET'])
-# def login_admin():
-#     if request.method == 'POST':
-#         correo = request.form['correo']
-#         contrasena = request.form['contrasena']
+@app.route('/admin', methods=['POST', 'GET'])
+def login_admin():
+    if request.method == 'POST':
+        correo = request.form['correo']
+        contrasena = request.form['contrasena']
         
-#         user = validar_admin(correo, contrasena)
-#         if user:
-#             login_user(user)
-#             return redirect(url_for('add_user'))
-#         else:
-#             return "Credenciales incorrectas"
+        user = validar_admin(correo, contrasena)
+        if user:
+            login_user(user)
+            return redirect(url_for('add_user'))
+        else:
+            return "Credenciales incorrectas"
 
-#     return render_template('login_admin.html')
+    return render_template('login_admin.html')
 
-# @app.route('/admin/add_user', methods=['GET'])
-# @login_required
-# def add_user():
-#     return render_template('admin.html')
+@app.route('/admin/add_user', methods=['GET'])
+@login_required
+def add_user():
+    return render_template('admin.html')
 
 
-# @app.route('/admin/add_user', methods=['POST'])
-# @login_required
-# def admin_superadmin():
-#     correo = request.form['username']
-#     contrasena = request.form['password']
-#     try:
-#         conn = mysql.connector.connect(**db_config)
-#         cursor = conn.cursor()
-#         query = "INSERT INTO credenciales (user, password) VALUES (%s, %s)"
-#         values = (correo, contrasena)
-#         cursor.execute(query, values)
-#         conn.commit()
-#         cursor.close()
-#         conn.close()
-#         print("Se agrego correctamente")
-#         return "Usuario agregado correctamente"
+@app.route('/admin/add_user', methods=['POST'])
+@login_required
+def admin_superadmin():
+    correo = request.form['username']
+    contrasena = request.form['password']
+    try:
+        conn = mysql.connector.connect(**db_config)
+        cursor = conn.cursor()
+        query = "INSERT INTO credenciales (user, password) VALUES (%s, %s)"
+        values = (correo, contrasena)
+        cursor.execute(query, values)
+        conn.commit()
+        cursor.close()
+        conn.close()
+        print("Se agrego correctamente")
+        return "Usuario agregado correctamente"
 
-#     except Exception as e:
-#         print('Error al guardar usuario', e)
-#         return "Error al guardar usuario: " + str(e)
+    except Exception as e:
+        print('Error al guardar usuario', e)
+        return "Error al guardar usuario: " + str(e)
 
 
 if __name__ == "__main__":
