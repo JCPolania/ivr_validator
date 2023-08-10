@@ -6,8 +6,9 @@ import os
 import mysql.connector
 from flask_login import LoginManager, UserMixin, login_user, login_required
 from flask_caching import Cache
-from functools import lru_cache
 from delete_database import delete_all_credentials
+from sqlalchemy.sql import text
+
 
 config = {
     "DEBUG": True,
@@ -150,49 +151,28 @@ def upload():
                 )
         else:
             flash("Success, Todos los datos son correctos.")
-
-            load_dotenv()
-            host = os.getenv('DB_HOST')
-            user = os.getenv('DB_USER')
-            password = os.getenv('DB_PASSWORD')
-            database = os.getenv('DB_DATABASE')
-
-            def create_connection():
-                try:
-                    connection = mysql.connector.connect(
-                        host=host,
-                        user=user,
-                        password=password,
-                        database=database
-                    )
-                    if connection.is_connected():
-                        flash("Conexión a la base de datos exitosa")
-                        return connection
-                except Exception as e:
-                    flash("Error en la conexión a la base de datos.", e)
-                    return None
-
-            def read_load_table(connection):
-                try:
-                    cursor = connection.cursor()
-                    df = pd.read_excel(file)                    
-                    for index, fila in df.iterrows():
-                        
-                        sql_insertar = f"""
-                        INSERT INTO validator_ivr (Id_Cliente__c, Operado_Por__c)
-                        VALUES ('{fila[0]}', '{fila[1]}')
-                        """
-                        cursor.execute(sql_insertar)    
-                    connection.commit()
-                    cursor.close()
-                    flash("Cargue de datos a la tabla exitoso")
-                except Exception as e:
-                    flash("Error en el cargue a la base de datos.", e)
+            
             delete_all_credentials()
-            conexion = create_connection()
-            if conexion:
-                read_load_table(conexion)
-                conexion.close()
+
+            import sqlalchemy
+            host = os.getenv('SQ_HOST')
+            username = os.getenv('SQ_USER')
+            password = os.getenv('SQ_PASSWORD')
+            database = os.getenv('SQ_DATABASE')
+            port = os.getenv('SQ_PORT')
+
+            def load_data_ivr():
+                try:
+                    url = f'''mysql+mysqlconnector://{username}:{password}@{host}:{port}/{database}'''
+
+                    engine = sqlalchemy.create_engine(url.format(url))
+
+                    df.to_sql('validator_ivr', engine, if_exists='append', index=False)
+                    flash("Se cargo correctamente a la base de datos")
+                except Exception as e:
+                    flash("Error en el cargue a la base de datos", e)
+            
+            load_data_ivr()
     except Exception as e:
         flash(f"Error: {str(e)}")
 
